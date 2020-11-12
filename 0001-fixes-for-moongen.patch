@@ -1,0 +1,101 @@
+From a010e9c097815a3a5ffae69f3397edc3598685d5 Mon Sep 17 00:00:00 2001
+From: Johannes Zerwas <johannes.zerwas@tum.de>
+Date: Thu, 12 Nov 2020 15:00:49 +0100
+Subject: [PATCH] fixes for moongen
+
+---
+ drivers/net/i40e/i40e_rxtx.c    | 7 +++++--
+ drivers/net/ixgbe/ixgbe_rxtx.c  | 8 +++++---
+ lib/librte_mbuf/rte_mbuf.c      | 1 +
+ lib/librte_mbuf/rte_mbuf_core.h | 7 +++++++
+ 4 files changed, 18 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/i40e/i40e_rxtx.c b/drivers/net/i40e/i40e_rxtx.c
+index fe7f9200c..91bb57b07 100644
+--- a/drivers/net/i40e/i40e_rxtx.c
++++ b/drivers/net/i40e/i40e_rxtx.c
+@@ -54,7 +54,8 @@
+ 		PKT_TX_TCP_SEG |		 \
+ 		PKT_TX_OUTER_IP_CKSUM)
+ 
+-#define I40E_TX_OFFLOAD_MASK (  \
++#define I40E_TX_OFFLOAD_MASK ( \
++        PKT_TX_NO_CRC_CSUM | \
+ 		PKT_TX_OUTER_IPV4 |	\
+ 		PKT_TX_OUTER_IPV6 |	\
+ 		PKT_TX_IPV4 |		\
+@@ -1103,7 +1104,9 @@ i40e_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+ 		}
+ 
+ 		/* Always enable CRC offload insertion */
+-		td_cmd |= I40E_TX_DESC_CMD_ICRC;
++        /* Enable CRC offload */
++        if (!(ol_flags & PKT_TX_NO_CRC_CSUM))
++            td_cmd |= I40E_TX_DESC_CMD_ICRC;
+ 
+ 		/* Fill in tunneling parameters if necessary */
+ 		cd_tunneling_params = 0;
+diff --git a/drivers/net/ixgbe/ixgbe_rxtx.c b/drivers/net/ixgbe/ixgbe_rxtx.c
+index 977ecf513..0f761f858 100644
+--- a/drivers/net/ixgbe/ixgbe_rxtx.c
++++ b/drivers/net/ixgbe/ixgbe_rxtx.c
+@@ -57,7 +57,8 @@
+ #define IXGBE_TX_IEEE1588_TMST 0
+ #endif
+ /* Bit Mask to indicate what bits required for building TX context */
+-#define IXGBE_TX_OFFLOAD_MASK (			 \
++#define IXGBE_TX_OFFLOAD_MASK ( \
++        PKT_TX_NO_CRC_CSUM |	\
+ 		PKT_TX_OUTER_IPV6 |		 \
+ 		PKT_TX_OUTER_IPV4 |		 \
+ 		PKT_TX_IPV6 |			 \
+@@ -820,8 +821,9 @@ ixgbe_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
+ 		 * are only set in the last Data Descriptor:
+ 		 *   - IXGBE_TXD_CMD_RS
+ 		 */
+-		cmd_type_len = IXGBE_ADVTXD_DTYP_DATA |
+-			IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT;
++        cmd_type_len = IXGBE_ADVTXD_DTYP_DATA | IXGBE_ADVTXD_DCMD_DEXT;
++        if (!(ol_flags & PKT_TX_NO_CRC_CSUM))
++            cmd_type_len |= IXGBE_ADVTXD_DCMD_IFCS;
+ 
+ #ifdef RTE_LIBRTE_IEEE1588
+ 		if (ol_flags & PKT_TX_IEEE1588_TMST)
+diff --git a/lib/librte_mbuf/rte_mbuf.c b/lib/librte_mbuf/rte_mbuf.c
+index 8a456e5e6..d66240523 100644
+--- a/lib/librte_mbuf/rte_mbuf.c
++++ b/lib/librte_mbuf/rte_mbuf.c
+@@ -746,6 +746,7 @@ const void *__rte_pktmbuf_read(const struct rte_mbuf *m, uint32_t off,
+ const char *rte_get_rx_ol_flag_name(uint64_t mask)
+ {
+ 	switch (mask) {
++	    case PKT_TX_NO_CRC_CSUM: return "PKT_TX_NO_CRC_CSUM";
+ 	case PKT_RX_VLAN: return "PKT_RX_VLAN";
+ 	case PKT_RX_RSS_HASH: return "PKT_RX_RSS_HASH";
+ 	case PKT_RX_FDIR: return "PKT_RX_FDIR";
+diff --git a/lib/librte_mbuf/rte_mbuf_core.h b/lib/librte_mbuf/rte_mbuf_core.h
+index 8cd7137ac..be79e4a2f 100644
+--- a/lib/librte_mbuf/rte_mbuf_core.h
++++ b/lib/librte_mbuf/rte_mbuf_core.h
+@@ -366,11 +366,18 @@ extern "C" {
+  */
+ #define PKT_TX_OUTER_IPV6    (1ULL << 60)
+ 
++/**
++ * Disable CRC checksum offload
++ */
++#define PKT_TX_NO_CRC_CSUM   (1ULL << 63)
++
++
+ /**
+  * Bitmask of all supported packet Tx offload features flags,
+  * which can be set for packet.
+  */
+ #define PKT_TX_OFFLOAD_MASK (    \
++        PKT_TX_NO_CRC_CSUM | \
+ 		PKT_TX_OUTER_IPV6 |	 \
+ 		PKT_TX_OUTER_IPV4 |	 \
+ 		PKT_TX_OUTER_IP_CKSUM |  \
+-- 
+2.29.2
+

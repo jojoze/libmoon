@@ -58,6 +58,7 @@ make install DESTDIR=$(pwd)
 (
 cd deps/dpdk
 #build DPDK with the right configuration
+git apply ../../0001-fixes-for-moongen.patch
 MAKE_PAUSE=n make config T=x86_64-native-linux-gcc O=x86_64-native-linux-gcc
 sed -ri 's,(CONFIG_RTE_LIBRTE_IEEE1588=).*,\1y,' x86_64-native-linux-gcc/.config
 if ${MLX5} ; then
