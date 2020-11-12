@@ -173,6 +173,9 @@ ffi.cdef[[
 		uint8_t rx_drop_en; /**< Drop packets if no descriptors are available. */
 		uint8_t rx_deferred_start; /**< Do not start queue with rte_eth_dev_start(). */
 		uint64_t offloads;
+
+		uint64_t reserved_64s[2]; /**< Reserved for future fields */
+	    void *reserved_ptrs[2];   /**< Reserved for future fields */
 	};
 
 	struct rte_eth_txconf {
@@ -183,6 +186,9 @@ ffi.cdef[[
 
 		uint8_t tx_deferred_start; /**< Do not start queue with rte_eth_dev_start(). */
 		uint64_t offloads;
+
+		uint64_t reserved_64s[2]; /**< Reserved for future fields */
+	    void *reserved_ptrs[2];   /**< Reserved for future fields */
 	};
 
 	struct rte_eth_dev_info {
@@ -195,6 +201,7 @@ ffi.cdef[[
 		const uint32_t *dev_flags; /**< Device flags */
 		uint32_t min_rx_bufsize; /**< Minimum size of RX buffer. */
 		uint32_t max_rx_pktlen; /**< Maximum configurable length of RX pkt. */
+		uint32_t max_lro_pkt_size;
 		uint16_t max_rx_queues; /**< Maximum number of RX queues. */
 		uint16_t max_tx_queues; /**< Maximum number of TX queues. */
 		uint32_t max_mac_addrs; /**< Maximum number of MAC addresses. */
@@ -233,6 +240,9 @@ ffi.cdef[[
 		/** Generic device capabilities (RTE_ETH_DEV_CAPA_). */
 		uint64_t dev_capa;
 		struct rte_eth_switch_info switch_info;
+
+		uint64_t reserved_64s[2]; /**< Reserved for future fields */
+	    void *reserved_ptrs[2];   /**< Reserved for future fields */
 	};
 
 	struct libmoon_device_config {
@@ -247,6 +257,7 @@ ffi.cdef[[
 		uint8_t disable_offloads;
 		uint8_t strip_vlan;
 		uint32_t rss_mask;
+		uint32_t link_speed;
 	};
 ]]
 
@@ -275,7 +286,7 @@ ffi.cdef[[
 
 	// devices
 	int rte_pci_probe();
-	int rte_eth_dev_count();
+	int rte_eth_dev_count_avail();
 	uint64_t dpdk_get_mac_addr(int port, char* buf);
 	void rte_eth_link_get(uint8_t port, struct rte_eth_link* link);
 	void rte_eth_link_get_nowait(uint8_t port, struct rte_eth_link* link);

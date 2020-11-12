@@ -58,6 +58,7 @@ struct libmoon_device_config {
 	uint8_t disable_offloads;
 	uint8_t strip_vlan;
 	uint32_t rss_mask;
+    uint32_t link_speed;
 };
 
 int dpdk_configure_device(struct libmoon_device_config* cfg) {
@@ -123,6 +124,9 @@ int dpdk_configure_device(struct libmoon_device_config* cfg) {
 		DEV_TX_OFFLOAD_MBUF_FAST_FREE
 		: (DEV_TX_OFFLOAD_VLAN_INSERT | DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_UDP_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM | DEV_TX_OFFLOAD_MBUF_FAST_FREE))
 		& dev_info.tx_offload_capa;
+	// TODO Fix this somehow config value is not transferred from lua...
+    cfg->link_speed = ETH_LINK_SPEED_10G | ETH_LINK_SPEED_FIXED;
+    printf("Requested link speed %u\n", cfg->link_speed);
 	struct rte_eth_conf port_conf = {
 		.rxmode = {
 			.mq_mode = cfg->enable_rss ? ETH_MQ_RX_RSS : ETH_MQ_RX_NONE,
@@ -135,11 +139,12 @@ int dpdk_configure_device(struct libmoon_device_config* cfg) {
 			.offloads = tx_offloads
 		},
 		.fdir_conf = fdir_conf,
-		.link_speeds = ETH_LINK_SPEED_AUTONEG,
+		.link_speeds = cfg->link_speed,
 	  	.rx_adv_conf = {
 			.rss_conf = rss_conf,
 		}
 	};
+    printf("Requested link speed conf struct %u\n", port_conf.link_speeds);
 	int rc = rte_eth_dev_configure(cfg->port, cfg->rx_queues, cfg->tx_queues, &port_conf);
 	if (rc) return rc;
 	struct rte_eth_txconf tx_conf = {

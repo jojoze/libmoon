@@ -17,7 +17,7 @@ local eth        = require "proto.ethernet"
 local E          = require "syscall".c.E
 
 function mod.numDevices()
-	return dpdkc.rte_eth_dev_count();
+	return dpdkc.rte_eth_dev_count_avail();
 end
 
 local dev = {}
@@ -96,8 +96,8 @@ function mod.config(args)
 	if args.port >= dpdkc.dpdk_get_max_ports() then
 		log:fatal("maximum number of supported ports is %d, this can be changed with the DPDK compile-time configuration variable RTE_MAX_ETHPORTS\n", dpdkc.dpdk_get_max_ports())
 	end
-	if args.port >= dpdkc.rte_eth_dev_count() then
-		log:fatal("there are only %d ports, tried to configure port id %d", dpdkc.rte_eth_dev_count(), args.port)
+	if args.port >= dpdkc.rte_eth_dev_count_avail() then
+		log:fatal("there are only %d ports, tried to configure port id %d", dpdkc.rte_eth_dev_count_avail(), args.port)
 	end
 	if mod.get(args.port) and mod.get(args.port).initialized then
 		log:warn("Device %d already configured, skipping initilization", args.port)
@@ -170,7 +170,9 @@ function mod.config(args)
 	elseif #args.mempools ~= args.rxQueues then
 		log:fatal("number of mempools must equal number of rx queues")
 	end
+	-- Link speed 0 means autoneg
 	args.speed = args.speed or 0
+	log:info("Requested link speed %s", args.speed)
 	if args.rxQueues == 0 or args.txQueues == 0 then
 		-- dpdk does not like devices without rx/tx queues :(
 		log:fatal("Cannot initialize device without %s queues", args.rxQueues == 0 and args.txQueues == 0 and "rx and tx" or args.rxQueues == 0 and "rx" or "tx")
@@ -188,9 +190,10 @@ function mod.config(args)
 		tx_descs = args.txDescs,
 		drop_enable = args.dropEnable,
 		enable_rss = args.rssQueues > 1,
-		rss_mask = rssMask,
 		disable_offloads = args.disableOffloads,
-		strip_vlan = args.stripVlan
+		strip_vlan = args.stripVlan,
+		rss_mask = rssMask,
+		link_speed = args.link_speed
 	}))
 	if rc ~= 0 then
 	    log:fatal("Could not configure device %d: error %s", args.port, strError(rc))
@@ -386,7 +389,10 @@ function dev:wait(maxWait)
 		end
 	until link.status
 	self.speed = link.speed
-	local out = string.format("Device %d (%s) is %s: %s%s MBit/s", self.id, self:getMacString(), link.status and "up" or "DOWN", link.duplex and "full-duplex " or "half-duplex ", link.speed)
+	local out = string.format("Device %d (%s) is %s: %s%s %s MBit/s", self.id, self:getMacString(),
+			link.status and "up" or "DOWN", link.duplex and "full-duplex " or "half-duplex ",
+			link.autoneg and "auto" or "fixed", link.speed
+	)
 	if link.status then
 		log:info(out)
 	else
@@ -620,7 +626,7 @@ end
 
 function mod.getDevices()
 	local result = {}
-	for i = 0, dpdkc.rte_eth_dev_count() - 1 do
+	for i = 0, dpdkc.rte_eth_dev_count_avail() - 1 do
 		local dev = mod.get(i)
 		result[#result + 1] = { id = i, mac = dev:getMacString(i), name = dev:getName(i) }
 	end
